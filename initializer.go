@@ -21,6 +21,10 @@ type metricDefWrapper struct {
 	client *armmonitor.MetricDefinitionsClient
 }
 
+type AzureClientOptions struct {
+	clientOptions *azcore.ClientOptions
+}
+
 func (w *metricDefWrapper) List(ctx context.Context, resourceID string, options *armmonitor.MetricDefinitionsClientListOptions) (armmonitor.MetricDefinitionsClientListResponse, error) {
 	var response armmonitor.MetricDefinitionsClientListResponse
 
@@ -36,11 +40,12 @@ func (w *metricDefWrapper) List(ctx context.Context, resourceID string, options 
 }
 
 // CreateAzureClients creates Azure clients with service principal credentials
-func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string, clientOptions ...*azcore.ClientOptions) (*AzureClients, error) {
+func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string, clientOptions ...func(*AzureClientOptions)) (*AzureClients, error) {
 	var options *azidentity.ClientSecretCredentialOptions = nil
+	azureClientOptions := checkOptionalClientParameters(clientOptions, &AzureClientOptions{})
 
-	if len(clientOptions) != 0 {
-		options = &azidentity.ClientSecretCredentialOptions{ClientOptions: *clientOptions[0]}
+	if azureClientOptions != nil {
+		options = &azidentity.ClientSecretCredentialOptions{ClientOptions: *azureClientOptions.clientOptions}
 	}
 
 	credential, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, options)
@@ -48,19 +53,20 @@ func CreateAzureClients(subscriptionID string, clientID string, clientSecret str
 		return nil, fmt.Errorf("error creating Azure client credential: %w", err)
 	}
 
-	if len(clientOptions) != 0 {
-		return CreateAzureClientsWithCreds(subscriptionID, credential, clientOptions[0])
+	if azureClientOptions != nil {
+		return CreateAzureClientsWithCreds(subscriptionID, credential, WithAzureClientOptions(azureClientOptions.clientOptions))
 	} else {
 		return CreateAzureClientsWithCreds(subscriptionID, credential)
 	}
 }
 
 // CreateAzureClientsWithCreds creates Azure clients with provided TokenCredential
-func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential, clientOptions ...*azcore.ClientOptions) (*AzureClients, error) {
+func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential, clientOptions ...func(*AzureClientOptions)) (*AzureClients, error) {
 	var armClientOptions *arm.ClientOptions = nil
+	azureClientOptions := checkOptionalClientParameters(clientOptions, &AzureClientOptions{})
 
-	if len(clientOptions) != 0 {
-		armClientOptions = &arm.ClientOptions{ClientOptions: *clientOptions[0]}
+	if azureClientOptions != nil {
+		armClientOptions = &arm.ClientOptions{ClientOptions: *azureClientOptions.clientOptions}
 	}
 
 	metricClient, err := armmonitor.NewMetricsClient(subscriptionID, credential, armClientOptions)
@@ -83,6 +89,26 @@ func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenC
 		MetricsClient:           metricClient,
 		MetricDefinitionsClient: &metricDefWrapper{client: defClient},
 	}, nil
+}
+
+type ClientOptions func(*AzureClientOptions)
+
+func WithAzureClientOptions(options *azcore.ClientOptions) ClientOptions {
+	return func(azureClientOptions *AzureClientOptions) {
+		azureClientOptions.clientOptions = options
+	}
+}
+
+func checkOptionalClientParameters(clientOptions []func(*AzureClientOptions), azureClientOptions *AzureClientOptions) *AzureClientOptions {
+	if clientOptions != nil {
+		for _, optArgs := range clientOptions {
+			optArgs(azureClientOptions)
+			if &azureClientOptions != nil {
+				return azureClientOptions
+			}
+		}
+	}
+	return nil
 }
 
 func (ammr *AzureMonitorMetricsReceiver) checkValidation() error {

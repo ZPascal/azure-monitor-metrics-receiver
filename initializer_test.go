@@ -17,7 +17,7 @@ func TestCreateAzureClients_WithoutCustomOptions(t *testing.T) {
 
 func TestCreateAzureClients_WithCustomOptions(t *testing.T) {
 	options := &azcore.ClientOptions{Cloud: cloud.AzureGovernment}
-	_, err := CreateAzureClients(testSubscriptionID, testClientID, testClientSecret, testTenantID, options)
+	_, err := CreateAzureClients(testSubscriptionID, testClientID, testClientSecret, testTenantID, WithAzureClientOptions(options))
 
 	require.NoError(t, err)
 }
