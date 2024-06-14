@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -35,26 +36,38 @@ func (w *metricDefWrapper) List(ctx context.Context, resourceID string, options 
 }
 
 // CreateAzureClients creates Azure clients with service principal credentials
-func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string) (*AzureClients, error) {
-	credential, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string, clientOptions *azcore.ClientOptions) (*AzureClients, error) {
+	var options *azidentity.ClientSecretCredentialOptions = nil
+
+	if clientOptions != nil {
+		options = &azidentity.ClientSecretCredentialOptions{ClientOptions: *clientOptions}
+	}
+
+	credential, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, options)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Azure client credential: %w", err)
 	}
-	return CreateAzureClientsWithCreds(subscriptionID, credential)
+	return CreateAzureClientsWithCreds(subscriptionID, credential, clientOptions)
 }
 
 // CreateAzureClientsWithCreds creates Azure clients with provided TokenCredential
-func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential) (*AzureClients, error) {
-	metricClient, err := armmonitor.NewMetricsClient(subscriptionID, credential, nil)
+func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential, clientOptions *azcore.ClientOptions) (*AzureClients, error) {
+	var armClientOptions *arm.ClientOptions = nil
+
+	if clientOptions != nil {
+		armClientOptions = &arm.ClientOptions{ClientOptions: *clientOptions}
+	}
+
+	metricClient, err := armmonitor.NewMetricsClient(subscriptionID, credential, armClientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Azure metric client: %w", err)
 	}
-	defClient, err := armmonitor.NewMetricDefinitionsClient(subscriptionID, credential, nil)
+	defClient, err := armmonitor.NewMetricDefinitionsClient(subscriptionID, credential, armClientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Azure definitions client: %w", err)
 	}
 
-	resClient, err := armresources.NewClient(subscriptionID, credential, nil)
+	resClient, err := armresources.NewClient(subscriptionID, credential, armClientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Azure definitions client: %w", err)
 	}
