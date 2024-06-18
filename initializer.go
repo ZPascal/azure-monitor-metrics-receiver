@@ -36,26 +36,31 @@ func (w *metricDefWrapper) List(ctx context.Context, resourceID string, options 
 }
 
 // CreateAzureClients creates Azure clients with service principal credentials
-func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string, clientOptions *azcore.ClientOptions) (*AzureClients, error) {
+func CreateAzureClients(subscriptionID string, clientID string, clientSecret string, tenantID string, clientOptions ...*azcore.ClientOptions) (*AzureClients, error) {
 	var options *azidentity.ClientSecretCredentialOptions = nil
 
-	if clientOptions != nil {
-		options = &azidentity.ClientSecretCredentialOptions{ClientOptions: *clientOptions}
+	if len(clientOptions) != 0 {
+		options = &azidentity.ClientSecretCredentialOptions{ClientOptions: *clientOptions[0]}
 	}
 
 	credential, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, options)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Azure client credential: %w", err)
 	}
-	return CreateAzureClientsWithCreds(subscriptionID, credential, clientOptions)
+
+	if len(clientOptions) != 0 {
+		return CreateAzureClientsWithCreds(subscriptionID, credential, clientOptions[0])
+	} else {
+		return CreateAzureClientsWithCreds(subscriptionID, credential)
+	}
 }
 
 // CreateAzureClientsWithCreds creates Azure clients with provided TokenCredential
-func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential, clientOptions *azcore.ClientOptions) (*AzureClients, error) {
+func CreateAzureClientsWithCreds(subscriptionID string, credential azcore.TokenCredential, clientOptions ...*azcore.ClientOptions) (*AzureClients, error) {
 	var armClientOptions *arm.ClientOptions = nil
 
-	if clientOptions != nil {
-		armClientOptions = &arm.ClientOptions{ClientOptions: *clientOptions}
+	if len(clientOptions) != 0 {
+		armClientOptions = &arm.ClientOptions{ClientOptions: *clientOptions[0]}
 	}
 
 	metricClient, err := armmonitor.NewMetricsClient(subscriptionID, credential, armClientOptions)

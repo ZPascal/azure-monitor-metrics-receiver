@@ -11,7 +11,7 @@ import (
 )
 
 func TestCreateAzureClients_WithoutCustomOptions(t *testing.T) {
-	_, err := CreateAzureClients(testSubscriptionID, testClientID, testClientSecret, testTenantID, nil)
+	_, err := CreateAzureClients(testSubscriptionID, testClientID, testClientSecret, testTenantID)
 	require.NoError(t, err)
 }
 
